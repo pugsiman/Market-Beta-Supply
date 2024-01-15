@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 
-from os import name
 from rich import print
 import numpy as np
 import yfinance as yf
 import pandas as pd
 import requests
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 pd.options.plotting.backend = 'plotly'
 
@@ -18,23 +16,25 @@ class Beta:
         self.n_obs = x.shape[0]
         self.x_mat = np.hstack([np.ones((self.x.shape[0], 1)), self.x])
 
-    def ols(self, x, y, weights = None):
-        if weights is None:
-            weights = np.ones(x.shape[0])
-        weights = np.diag(weights)
-
-        return np.linalg.inv(x.T @ weights @ x) @ x.T @ weights @ y
+    def ols(self):
+       return np.ravel(self._ols(self.x, self.y))[-1]
 
     def welch(self, delta: float = 3, rho = 2/256) -> float:
         bm_min, bm_max = (1 - delta) * self.x, (1 + delta) * self.x
         lower, upper = np.minimum(bm_min, bm_max), np.maximum(bm_min, bm_max)
         y_winsorized = np.atleast_2d(np.clip(self.y, lower, upper))
         weights = np.exp(-rho * np.arange(self.n_obs)[::-1])
-        beta = self.ols(self.x_mat, y_winsorized, weights=weights)
-        return np.ravel(beta)[1]
+        return np.ravel(self._ols(self.x_mat, y_winsorized, weights=weights))[1]
+
+    def _ols(self, x, y, weights = None):
+        if weights is None:
+            weights = np.ones(x.shape[0])
+        weights = np.diag(weights)
+
+        return np.linalg.inv(x.T @ weights @ x) @ x.T @ weights @ y
 
 BENCHMARK_INDEX = 'SPY'
-STOCK = 'AAPL'
+STOCK = 'IONQ'
 start_date = '2018-01-01'
 
 sample_data = yf.download(f'{STOCK} {BENCHMARK_INDEX}', start=start_date, progress=False)['Adj Close']
@@ -56,9 +56,8 @@ beta_fig = go.Figure(data=go.Scatter(
 )).update_traces(marker=dict(color='blue'))
 
 beta = Beta(sample_returns[BENCHMARK_INDEX], sample_returns[STOCK])
-ols_beta = beta.ols(beta.x, beta.y)[0]
+ols_beta = beta.ols()
 welch_beta = beta.welch()
-breakpoint()
 
 fig = go.Figure(data = returns_fig.data + beta_fig.data).update_layout(title=f'{STOCK} rolling beta', title_x = 0.5)
 # fig.show()
