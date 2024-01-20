@@ -59,9 +59,10 @@ def period_betas_window(chunk):
     date, df = chunk
     beta = Beta(df[BENCHMARK_INDEX], df[STOCK])
     trailing_window = sample_returns.loc[date-pd.DateOffset(days=252):date]
+    inception_window = sample_returns.loc[:date]
 
     trailing_beta = Beta(trailing_window[BENCHMARK_INDEX], trailing_window[STOCK])
-    inception_beta = Beta(df[BENCHMARK_INDEX], df[STOCK])
+    inception_beta = Beta(inception_window[BENCHMARK_INDEX], inception_window[STOCK])
 
     return [
         date, {
@@ -76,11 +77,12 @@ def period_betas_window(chunk):
 def isins_to_tickers(isin):
     try: 
         print(f'attempting to tanslate ISIN #{isin}...')
-        return investpy.stocks.search_stocks(by='isin', value=f'US{isin}')['symbol'][0]
+        return investpy.stocks.search_stocks(by='isin', value=f'{isin}')['symbol'][0]
     except RuntimeError as e:
         print('failed')
-        if 'ERR#0043' in e.args[0]: pass # match investpy network exception specifically
-        raise e
+        if 'ERR#0043' in e.args[0]:
+            pass # match investpy ne twork exception specifically
+        print('test')
 
 def persist_isins_as_tickers(isins):
     filepath = f'data/tickers-{today_date}.txt'
@@ -97,7 +99,7 @@ def create_beta_distribution(ticker):
     if not os.path.exists(filepath):
         with open(filepath, 'w+') as f:
             sample_data = yf.download(f'{tickers} {BENCHMARK_INDEX}', start=start_date, progress=False)['Adj Close']
-            sample_returns = sample_data.pct_change().dropna(axis='columns', how='all').dropna(axis='index', how='all')
+            sample_returns = sample_data.pct_change(fill_method=None).dropna(axis='columns', how='all').dropna(axis='index', how='all')
             sample_returns.index = pd.DatetimeIndex(sample_returns.index)
             trailing_window = sample_returns.iloc[-252:]
     
