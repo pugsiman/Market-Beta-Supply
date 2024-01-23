@@ -60,16 +60,16 @@ def rolling_beta_fig(sample_returns):
     fig.show()
 
 def period_betas_window(chunk):
-    date, df = chunk
+    date_idx, df = chunk
     beta = Beta(df[BENCHMARK_INDEX], df[STOCK])
-    trailing_window = sample_returns.loc[date-pd.DateOffset(days=252):date]
-    inception_window = sample_returns.loc[:date]
+    trailing_window = sample_returns.loc[date_idx-pd.DateOffset(days=252):date_idx]
+    inception_window = sample_returns.loc[:date_idx]
 
     trailing_beta = Beta(trailing_window[BENCHMARK_INDEX], trailing_window[STOCK])
     inception_beta = Beta(inception_window[BENCHMARK_INDEX], inception_window[STOCK])
 
     return [
-        date, {
+        date_idx, {
             'ols_beta': beta.ols(),
             'bsw_beta': beta.welch(rho=False),
             'bswa_beta': beta.welch(),
@@ -81,15 +81,15 @@ def period_betas_window(chunk):
 def isins_to_tickers(isin):
     try: 
         print(f'attempting to tanslate ISIN #{isin}...')
-        return investpy.stocks.search_stocks(by='isin', value=f'{isin}')['symbol'][0]
+        return investpy.stocks.search_stocks(by='isin', value=isin)['symbol'][0]
     except RuntimeError as e:
         print('failed')
         if 'ERR#0043' in e.args[0]:
-            pass # match investpy ne twork exception specifically
+            pass # match investpy network exception specifically
         print('test')
 
 def persist_isins_as_tickers(isins):
-    filepath = f'data/tickers.txt'
+    filepath = 'data/tickers.txt'
     if not os.path.exists(filepath):
         with open(filepath, 'a+') as f:
             tickers = list(filter(None, map(isins_to_tickers, isins)))
@@ -113,10 +113,10 @@ def main():
 
     beta_series_json_path = 'data/beta_dist-2024-01-18 00:00:00.json'
     beta_series = pd.read_json(beta_series_json_path, typ='series').rename('beta')
-    beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(opacity=0.7, selector=dict(type="histogram")).update_layout(
+    beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(opacity=0.7, selector=dict(type='histogram')).update_layout(
         title_text='Market beta distribution', title_font=dict(size=24), title_x=0.5, bargap=0.1,
-        xaxis = dict( showgrid = False, showline = True, linecolor = 'black'),
-        yaxis = dict( showgrid = False, showline = True, linecolor = 'black'),
+        xaxis = dict(showgrid = False, showline = True, linecolor = 'black'),
+        yaxis = dict(showgrid = False, showline = True, linecolor = 'black'),
         showlegend = False
     ).add_vline(x=np.median(beta_series), line_dash = 'dash', line_width=2).show()
 
