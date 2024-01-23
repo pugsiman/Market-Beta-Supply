@@ -2,16 +2,20 @@
 
 from rich import print
 import numpy as np
-import yfinance as yf
+from yahooquery import Ticker
 import pandas as pd
 import investpy
-import requests
 import plotly.graph_objects as go
 import tabula
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import os
 
 pd.options.plotting.backend = 'plotly'
+
+BENCHMARK_INDEX = 'SPY'
+STOCK = 'NVDA'
+start_date = '2018-01-01'
+today_date = datetime.today().strftime('%Y-%m-%d')
 
 class Beta:
     def __init__(self, x: np.array, y: np.array):
@@ -85,7 +89,7 @@ def isins_to_tickers(isin):
         print('test')
 
 def persist_isins_as_tickers(isins):
-    filepath = f'data/tickers-{today_date}.txt'
+    filepath = f'data/tickers.txt'
     if not os.path.exists(filepath):
         with open(filepath, 'a+') as f:
             tickers = list(filter(None, map(isins_to_tickers, isins)))
@@ -93,49 +97,29 @@ def persist_isins_as_tickers(isins):
 
     return open(filepath, 'r').read()
 
-def create_beta_distribution(ticker):
-    filepath = f'data/beta_dist-{today_date}.json'
+def main():
+    # sample_data = Ticker(f'{STOCK} {BENCHMARK_INDEX}', asynchronous=True).history(period='1y')['adjclose']
+    # sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna() 
+    # sample_returns.index = pd.DatetimeIndex(sample_returns.index)
+    # rolling_beta_fig(sample_returns)
 
-    if not os.path.exists(filepath):
-        with open(filepath, 'w+') as f:
-            sample_data = yf.download(f'{tickers} {BENCHMARK_INDEX}', start=start_date, progress=False)['Adj Close']
-            sample_returns = sample_data.pct_change(fill_method=None).dropna(axis='columns', how='all').dropna(axis='index', how='all')
-            sample_returns.index = pd.DatetimeIndex(sample_returns.index)
-            trailing_window = sample_returns.iloc[-252:]
-    
-            welch_betas = []
-            for ticker in tickers.split(' '):
-                try:
-                    beta = Beta(trailing_window[BENCHMARK_INDEX], trailing_window[ticker]).welch()
-                    welch_betas.append(beta)
-                except KeyError:
-                    print(f'{ticker} was truncated out of dataframe and could not be calculated')
-                    continue
+    # results = dict(map(period_betas_window, sample_returns.groupby(pd.Grouper(freq='M'))))
+    # df = pd.DataFrame(results).T
 
-            welch_series = pd.Series(welch_betas)
-            f.write(welch_series.to_json())
+    # fig = df.plot(title=f'{STOCK} rolling betas comparison').update_layout(title_x=0.5, xaxis_title='Date', legend_title='estimators').update_xaxes(dtick='M1').show()
+    # pdf = tabula.read_pdf('https://assets-global.website-files.com/60f8038183eb84c40e8c14e9/6584d5f51c7b43b924c8e414_Wilshire-5000-Index-Fund-Holdings.pdf', stream=True, pages='all', guess=False)
+    # isins = np.concatenate(list(map(lambda df: df.iloc[2::,0].values, pdf)))
+    # tickers = persist_isins_as_tickers(isins) # 'AAPL CVX NRG ...'
 
-    return filepath
+    beta_series_json_path = 'data/beta_dist-2024-01-18 00:00:00.json'
+    beta_series = pd.read_json(beta_series_json_path, typ='series').rename('beta')
+    beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(opacity=0.7, selector=dict(type="histogram")).update_layout(
+        title_text='Market beta distribution', title_font=dict(size=24), title_x=0.5, bargap=0.1,
+        xaxis = dict( showgrid = False, showline = True, linecolor = 'black'),
+        yaxis = dict( showgrid = False, showline = True, linecolor = 'black'),
+        showlegend = False
+    ).add_vline(x=np.median(beta_series), line_dash = 'dash', line_width=2).show()
 
-
-BENCHMARK_INDEX = 'SPY'
-STOCK = 'NVDA'
-start_date = '2018-01-01'
-today_date = datetime.today().strftime('%Y-%m-%d')
-
-# sample_data = yf.download(f'{STOCK} {BENCHMARK_INDEX}', start=start_date, progress=False)['Adj Close']
-# sample_returns = sample_data.pct_change().dropna()
-# sample_returns.index = pd.DatetimeIndex(sample_returns.index)
-# rolling_beta_fig(sample_returns)
-
-# results = dict(map(period_betas_window, sample_returns.groupby(pd.Grouper(freq='M'))))
-# df = pd.DataFrame(results).T
-
-# fig = df.plot(title=f'{STOCK} rolling betas comparison').update_layout(title_x=0.5, xaxis_title='Date', legend_title='estimators').update_xaxes(dtick='M1').show()
-pdf = tabula.read_pdf('https://assets-global.website-files.com/60f8038183eb84c40e8c14e9/6584d5f51c7b43b924c8e414_Wilshire-5000-Index-Fund-Holdings.pdf', stream=True, pages='all', guess=False)
-isins = np.concatenate(list(map(lambda df: df.iloc[2::,0].values, pdf)))
-tickers = persist_isins_as_tickers(isins) # 'AAPL CVX NRG ...'
-beta_series_json_path = create_beta_distribution(tickers)
-beta_series = pd.read_json(beta_series_json_path, typ='series')
-beta_series.hist().update_layout(title_text='Market beta distribution', title_x=0.5, bargap=0.2).show()
+if __name__ == '__main__':
+    main()
 
