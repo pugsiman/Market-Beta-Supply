@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
 
-import numpy as np
 from yahooquery import Ticker
 import pandas as pd
-import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 import os
+from beta import Beta
 
-def create_beta_distribution(sample_data, date):
-    filepath = f'data/beta_dist-{date}.json'
+BENCHMARK_INDEX = 'SPY'
+
+
+def create_beta_distribution(sample_returns, date_str, tickers):
+    filepath = f'data/beta_dist-{date_str}.json'
 
     if not os.path.exists(filepath):
         with open(filepath, 'w+') as f:
-            trailing_window = sample_data.loc[date-pd.DateOffset(days=252):date]
-    
+            trailing_window = sample_returns.loc[date_str - pd.DateOffset(days=252) : date_str]
+
             welch_betas = []
             for ticker in tickers.split(' '):
                 try:
                     beta = Beta(trailing_window[BENCHMARK_INDEX], trailing_window[ticker]).welch()
                     welch_betas.append(beta)
                 except KeyError:
-                    print(f'{ticker} was truncated out of dataframe and could not be calculated')
+                    print(f'{ticker} ({date_str}) was truncated out of dataframe and could not be calculated')
                     continue
 
             welch_series = pd.Series(welch_betas)
@@ -28,12 +30,33 @@ def create_beta_distribution(sample_data, date):
 
     return filepath
 
-tickers = open('data/tickers.txt', 'r').read()
-sample_data = Ticker(f'{tickers} {BENCHMARK_INDEX}', asynchronous=True).history(period='2y')['adjclose']
-sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna() 
-sample_returns.index = pd.DatetimeIndex(sample_returns.index)
 
-dates = pd.bdate_range(start='05/1/2023', end='18/1/2024')
-for date in dates:
-    create_beta_distribution(sample_returns, date)
+def persist_tickers(tickers):
+    filepath = 'data/tickers.txt'
+    if not os.path.exists(filepath):
+        with open(filepath, 'a+') as f:
+            f.write(' '.join(map(str, tickers)))
+
+    return filepath
+
+def main():
+    stocks_filepath = 'data/nasdaq_screener_1706639204979.csv'
+    df = pd.read_csv(stocks_filepath)
+
+    # filter out small, biotech, warrants or other special instruments
+    sample_stocks = df[(df['Country'] == 'United States') & (df['Market Cap'] > 1000000) & (df['Sector'] != 'Health Care') & (df['Symbol'].astype(str).map(len) <= 4)]
+    tickers = sample_stocks['Symbol'].values
+    tickers_filepath = persist_tickers(tickers)
+    tickers = open(tickers_filepath, 'r').read()
+
+    sample_data = Ticker(f'{tickers} {BENCHMARK_INDEX}', asynchronous=True).history(period='2y', interval='1d')['adjclose']
+    sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna(axis='index', how='all')
+    sample_returns.index = pd.DatetimeIndex(sample_returns.index).tz_localize(None)
+    dates = pd.bdate_range(start='21/1/2023', end='26/1/2024')
+    for date_str in dates:
+        create_beta_distribution(sample_returns, date_str, tickers)
+
+
+if __name__ == '__main__':
+    main()
 

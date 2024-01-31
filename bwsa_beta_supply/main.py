@@ -2,13 +2,14 @@
 
 from rich import print
 import numpy as np
-from yahooquery import Ticker
+import yahooquery as yq
 import pandas as pd
-import investpy
+import requests
 import plotly.graph_objects as go
 import tabula
 from datetime import datetime, date, timedelta
 import os
+from utils.beta import Beta
 
 pd.options.plotting.backend = 'plotly'
 
@@ -16,31 +17,6 @@ BENCHMARK_INDEX = 'SPY'
 STOCK = 'NVDA'
 start_date = '2018-01-01'
 today_date = datetime.today().strftime('%Y-%m-%d')
-
-
-class Beta:
-    def __init__(self, x: np.array, y: np.array):
-        self.x = np.atleast_2d(x).T
-        self.y = np.atleast_2d(y).T
-        self.n_obs = x.shape[0]
-        self.x_mat = np.hstack([np.ones((self.x.shape[0], 1)), self.x])
-
-    def ols(self):
-        return np.ravel(self._ols(self.x, self.y))[-1]
-
-    def welch(self, delta: float = 3, rho=2 / 256) -> float:
-        bm_min, bm_max = (1 - delta) * self.x, (1 + delta) * self.x
-        lower, upper = np.minimum(bm_min, bm_max), np.maximum(bm_min, bm_max)
-        y_winsorized = np.atleast_2d(np.clip(self.y, lower, upper))
-        weights = np.exp(-rho * np.arange(self.n_obs)[::-1]) if rho else None
-        return np.ravel(self._ols(self.x_mat, y_winsorized, weights=weights))[1]
-
-    def _ols(self, x, y, weights=None):
-        if weights is None:
-            weights = np.ones(x.shape[0])
-        weights = np.diag(weights)
-
-        return np.linalg.inv(x.T @ weights @ x) @ x.T @ weights @ y
 
 
 def rolling_beta_fig(sample_returns):
@@ -86,56 +62,58 @@ def period_betas_window(chunk):
         },
     ]
 
-
-def isins_to_tickers(isin):
-    try:
-        print(f'attempting to tanslate ISIN #{isin}...')
-        return investpy.stocks.search_stocks(by='isin', value=isin)['symbol'][0]
-    except RuntimeError as e:
-        print('failed')
-        if 'ERR#0043' in e.args[0]:
-            pass  # match investpy network exception specifically
-        print('test')
-
-
-def persist_isins_as_tickers(isins):
+def persist_tickers(tickers):
     filepath = 'data/tickers.txt'
     if not os.path.exists(filepath):
         with open(filepath, 'a+') as f:
-            tickers = list(filter(None, map(isins_to_tickers, isins)))
             f.write(' '.join(map(str, tickers)))
 
     return open(filepath, 'r').read()
 
-
 def main():
-    # sample_data = Ticker(f'{STOCK} {BENCHMARK_INDEX}', asynchronous=True).history(period='1y')['adjclose']
+    # sample_data = yq.Ticker(f'{STOCK} {BENCHMARK_INDEX}', asynchronous=True).history(period='1y')['adjclose']
     # sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna()
     # sample_returns.index = pd.DatetimeIndex(sample_returns.index)
     # rolling_beta_fig(sample_returns)
 
     # results = dict(map(period_betas_window, sample_returns.groupby(pd.Grouper(freq='M'))))
     # df = pd.DataFrame(results).T
-
     # fig = df.plot(title=f'{STOCK} rolling betas comparison').update_layout(title_x=0.5, xaxis_title='Date', legend_title='estimators').update_xaxes(dtick='M1').show()
-    # pdf = tabula.read_pdf('https://assets-global.website-files.com/60f8038183eb84c40e8c14e9/6584d5f51c7b43b924c8e414_Wilshire-5000-Index-Fund-Holdings.pdf', stream=True, pages='all', guess=False)
-    # isins = np.concatenate(list(map(lambda df: df.iloc[2::,0].values, pdf)))
-    # tickers = persist_isins_as_tickers(isins) # 'AAPL CVX NRG ...'
 
-    beta_series_json_path = 'data/beta_dist-2024-01-18 00:00:00.json'
-    beta_series = pd.read_json(beta_series_json_path, typ='series').rename('beta')
-    beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(
-        opacity=0.7, selector=dict(type='histogram')
-    ).update_layout(
-        title_text='Market beta distribution',
-        title_font=dict(size=24),
-        title_x=0.5,
-        bargap=0.1,
-        xaxis=dict(showgrid=False, showline=True, linecolor='black'),
-        yaxis=dict(showgrid=False, showline=True, linecolor='black'),
-        showlegend=False,
-    ).add_vline(x=np.median(beta_series), line_dash='dash', line_width=2).show()
 
+    # beta_series_json_path = 'data/beta_dist-2024-01-18 00:00:00.json'
+    # beta_series = pd.read_json(beta_series_json_path, typ='series').rename('beta')
+    # beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(
+    #     opacity=0.7, selector=dict(type='histogram')
+    # ).update_layout(
+    #     title_text='Market beta distribution',
+    #     title_font=dict(size=24),
+    #     title_x=0.5,
+    #     bargap=0.1,
+    #     xaxis=dict(showgrid=False, showline=True, linecolor='black'),
+    #     yaxis=dict(showgrid=False, showline=True, linecolor='black'),
+    #     showlegend=False,
+    # ).add_vline(x=np.median(beta_series), line_dash='dash', line_width=2).show()
+    filepath = 'data/nasdaq_screener_1706639204979.csv'
+    df = pd.read_csv(filepath)
+    # filter out small, biotech, and warrants or other special instruments
+    sample_stocks = df[(df['Country'] == 'United States') & (df['Market Cap'] > 1000000) & (df['Sector'] != 'Health Care') & (df['Symbol'].astype(str).map(len) <= 4)]
+    tickers = sample_stocks['Symbol'].values
+    persist_tickers(tickers)
+
+    directory = os.fsencode('data')
+    series = [] 
+    for file in os.scandir(directory):
+        filename = os.fsdecode(file)
+        if filename.endswith('.json'): 
+            try:
+                with open(f'data/{filename}') as f: 
+                    json_series = pd.read_json(f.read(), typ='series')
+                    series.append(json_series)
+            except ValueError as e:
+                continue
+    df = pd.DataFrame(series)
 
 if __name__ == '__main__':
     main()
+
