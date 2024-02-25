@@ -43,16 +43,16 @@ def main():
     stocks_filepath = 'data/nasdaq_screener_1706639204979.csv'
     df = pd.read_csv(stocks_filepath)
 
-    # filter out small, biotech, warrants or other special instruments
+    # filter out nanocap, biotech, warrants and other special instruments
     sample_stocks = df[(df['Country'] == 'United States') & (df['Market Cap'] > 1000000) & (df['Sector'] != 'Health Care') & (df['Symbol'].astype(str).map(len) <= 4)]
     tickers = sample_stocks['Symbol'].values
     tickers_filepath = persist_tickers(tickers)
     tickers = open(tickers_filepath, 'r').read()
 
-    sample_data = Ticker(f'{tickers} {BENCHMARK_INDEX}', asynchronous=True).history(period='2y', interval='1d')['adjclose']
+    sample_data = Ticker(f'{tickers} {BENCHMARK_INDEX}', asynchronous=True).history(period='4y', interval='1d')['adjclose']
     sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna(axis='index', how='all')
     sample_returns.index = pd.DatetimeIndex(sample_returns.index).tz_localize(None)
-    dates = pd.bdate_range(start='21/1/2023', end='26/1/2024')
+    dates = pd.bdate_range(start='1/1/2021', end=pd.to_datetime('now').tz_localize('EST').date().strftime('%d-%m-%Y'))
     for date_str in dates:
         create_beta_distribution(sample_returns, date_str, tickers)
 
