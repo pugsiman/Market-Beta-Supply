@@ -142,7 +142,7 @@ def main():
 
     ).add_hline(y=-1 * beta_supply['short_slope'].std(), line_dash='dash', line_width=1).add_hline(y=-2 * beta_supply['short_slope'].std(), line_dash='dash', line_width=1)
 
-    for i, infl in enumerate(infls, 1):
+    for _, infl in enumerate(infls, 1):
         if beta_supply['short_slope'].iloc[infl] <= -1 * beta_supply['short_slope'].std():
             figs.add_vline(x=beta_supply['short_slope'].index[infl+1], opacity=.4, line_color='green') 
 
