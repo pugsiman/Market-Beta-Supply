@@ -52,7 +52,8 @@ def main():
     sample_data = Ticker(f'{tickers} {BENCHMARK_INDEX}', asynchronous=True).history(period='3y', interval='1d')['adjclose']
     sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna(axis='index', how='all')
     sample_returns.index = pd.DatetimeIndex(sample_returns.index).tz_localize(None)
-    dates = pd.bdate_range(start='1/1/2021', end=pd.to_datetime('now').tz_localize('EST').date().strftime('%d-%m-%Y'))
+    dates = pd.bdate_range(start='1/1/2021', end=pd.to_datetime('now').tz_localize('EST').date())
+    breakpoint()
     for date_str in dates:
         create_beta_distribution(sample_returns, date_str, tickers)
 
