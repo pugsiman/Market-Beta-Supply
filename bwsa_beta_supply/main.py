@@ -108,7 +108,7 @@ def main():
                 continue
 
     df = pd.DataFrame(series).sort_index().T
-    beta_supply = ((df[df > 1.98].count() / df.count()) * 100).to_frame(name='supply_count')
+    beta_supply = ((df[df > 1.9].count() / df.count()) * 100).to_frame(name='supply_count')
     beta_supply['short_slope'] = beta_supply.rolling(7).apply(lambda s: linregress(range(len(s)), s)[0])
     slope_deriv = np.gradient(beta_supply['short_slope'])
     infls = np.where(np.diff(np.sign(slope_deriv)))[0]
