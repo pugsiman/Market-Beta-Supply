@@ -109,6 +109,8 @@ def main():
 
     df = pd.DataFrame(series).sort_index().T
     beta_supply = ((df[df > 1.9].count() / df.count()) * 100).to_frame(name='supply_count')
+    beta_dispersion = df.where(df.gt(df.quantile(0.9))).stack().groupby(level=1).agg('mean') - df.where(df.lt(df.quantile(0.1))).stack().groupby(level=1).agg('mean')
+    beta_dispersion_trace = beta_dispersion.to_frame(name='beta_dispersion').plot()
     beta_supply['short_slope'] = beta_supply.rolling(7).apply(lambda s: linregress(range(len(s)), s)[0])
     slope_deriv = np.gradient(beta_supply['short_slope'])
     infls = np.where(np.diff(np.sign(slope_deriv)))[0]
@@ -117,12 +119,12 @@ def main():
         data=go.Scatter(
             x=beta_supply.index,
             y=beta_supply['short_slope'].values,
-            name='rolling 7d change',
+            name='7-day change',
         )
     )
 
-    figs = go.Figure(data=short_trace.data + beta_supply['supply_count'].plot().data).update_layout(
-        title=dict(text='Beta supply forecast', font_size=24, x=0.5),
+    figs = go.Figure(data=short_trace.data + beta_supply['supply_count'].plot().data + beta_dispersion_trace.data).update_layout(
+        title=dict(text='Beta supply', font_size=24, x=0.5),
         xaxis=dict(
             ticklabelmode='period', dtick='M1', showline=True, showgrid=False, type='date',
             rangeselector=dict(
@@ -150,6 +152,7 @@ def main():
         texttemplate='%{y:.2f}',
         textposition='top center',
         hovertemplate='Date: %{x}<br>Value: %{y:.2f}<br>',
+        # hoverlabel=dict(rgba=''),
         marker_line_color= '#800020',
         marker_line_width=1.5,
     )
