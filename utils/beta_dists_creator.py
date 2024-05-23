@@ -40,7 +40,7 @@ def persist_tickers(tickers):
     return filepath
 
 def main():
-    stocks_filepath = 'data/nasdaq_screener_1706639204979.csv'
+    stocks_filepath = 'data/nasdaq_screener_1716427416246.csv'
     df = pd.read_csv(stocks_filepath)
 
     # filter out nanocap, biotech, warrants and other special instruments
@@ -53,7 +53,7 @@ def main():
     sample_returns = sample_data.unstack().T.pct_change(fill_method=None).dropna(axis='index', how='all')
     sample_returns.index = pd.DatetimeIndex(sample_returns.index).tz_localize(None)
     dates = pd.bdate_range(start='1/1/2021', end=pd.to_datetime('now').tz_localize('EST').date())
-    breakpoint()
+    
     for date_str in dates:
         create_beta_distribution(sample_returns, date_str, tickers)
 

@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 class Beta:
@@ -22,6 +21,5 @@ class Beta:
         if weights is None:
             weights = np.ones(x.shape[0])
         weights = np.diag(weights)
-
         return np.linalg.inv(x.T @ weights @ x) @ x.T @ weights @ y
 
