@@ -40,7 +40,7 @@ def persist_tickers(tickers):
     return filepath
 
 def main():
-    stocks_filepath = 'data/nasdaq_screener_1716427416246.csv'
+    stocks_filepath = 'data/nasdaq_screener.csv'
     df = pd.read_csv(stocks_filepath)
 
     # filter out nanocap, biotech, warrants and other special instruments
