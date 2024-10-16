@@ -52,7 +52,7 @@ def main():
     sample_stocks = df[
         (df['Test Issue'] == 'N')
         & (df['ETF'] == 'N')
-        & (df['Symbol'].str.match(r'[A-Za-z]{2,4}'))
+        & (df['Symbol'].str.match(r'^[A-Za-z]{2,4}$', na=False))
         & ~(df['Security Name'].str.contains('ETN', na=False))
     ]
     tickers = sample_stocks['Symbol'].values
