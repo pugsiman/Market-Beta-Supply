@@ -2,11 +2,12 @@
 
 from yahooquery import Ticker
 import pandas as pd
-from datetime import datetime, date, timedelta
 import os
 from beta import Beta
 
 BENCHMARK_INDEX = 'SPY'
+INITIAL_DATE = '1/1/2021'
+NASDAQ_FTP_PATH = 'ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqtraded.txt'
 
 
 def create_beta_distribution(sample_returns, date_str, tickers):
@@ -18,13 +19,15 @@ def create_beta_distribution(sample_returns, date_str, tickers):
                 date_str - pd.DateOffset(days=252) : date_str
             ]
 
-            welch_betas = {}
+            welch_betas = {'values': {}, 'residuals': {}}
             for ticker in tickers.split(' '):
                 try:
                     beta = Beta(
                         trailing_window[BENCHMARK_INDEX], trailing_window[ticker]
                     ).welch()
-                    welch_betas[ticker] = beta
+
+                    welch_betas['values'][ticker] = beta[1]
+                    welch_betas['residuals'][ticker] = beta[0]
                 except KeyError:
                     print(
                         f'{ticker} ({date_str}) was truncated out of dataframe and could not be calculated'
@@ -47,8 +50,9 @@ def persist_tickers(tickers):
 
 
 def main():
-    stocks_filepath = 'ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqtraded.txt'
+    stocks_filepath = NASDAQ_FTP_PATH
     df = pd.read_csv(stocks_filepath, sep='|')
+    # attempt to clean off some of the obviously bad tickers (ETFs, ETNs, tests, broken symbols etc')
     sample_stocks = df[
         (df['Test Issue'] == 'N')
         & (df['ETF'] == 'N')
@@ -70,7 +74,7 @@ def main():
     )
     sample_returns.index = pd.DatetimeIndex(sample_returns.index).tz_localize(None)
     dates = pd.bdate_range(
-        start='1/1/2021', end=pd.to_datetime('now').tz_localize('EST').date()
+        start=INITIAL_DATE, end=pd.to_datetime('now').tz_localize('EST').date()
     )
 
     for date_str in dates:
