@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import json
 from scipy.stats import linregress
 from scipy.stats import zscore
 
@@ -68,49 +69,6 @@ def period_betas_window(chunk):
     ]
 
 
-def beta_dist_fig():
-    beta_series_json_path = ''
-    beta_series = pd.read_json(beta_series_json_path, typ='series').rename('beta')
-    beta_series.hist(x='beta', marginal='box', nbins=100).update_traces(
-        opacity=0.7, selector=dict(type='histogram')
-    ).update_layout(
-        title_text='Market beta distribution',
-        title_font=dict(size=24),
-        title_x=0.5,
-        bargap=0.1,
-        xaxis=dict(showgrid=False, showline=True, linecolor='black'),
-        yaxis=dict(showgrid=False, showline=True, linecolor='black'),
-        showlegend=False,
-    )
-
-
-def junk_abnormal_returns_fig(beta_supply):
-    junk_stocks_sample = yq.Ticker(f'{JUNK_STOCKS}', asynchronous=True).history(
-        period='1y'
-    )['adjclose']
-    junk_stocks_zscores = (
-        junk_stocks_sample.unstack()
-        .T.pct_change(fill_method=None)
-        .dropna()
-        .T.transform(zscore, axis=1)
-        .mean()
-    )
-    junk_stocks_delayed_zscores = junk_stocks_zscores.shift(-1).to_frame(
-        name='1d_lagged_mean_zscore'
-    )
-    junk_stocks_delayed_zscores.index = pd.DatetimeIndex(
-        junk_stocks_delayed_zscores.index
-    )
-    corr_df = junk_stocks_delayed_zscores.join(beta_supply)
-    fig = px.scatter(
-        x=corr_df['short_slope'],
-        y=corr_df['1d_lagged_mean_zscore'],
-        trendline='ols',
-        template='plotly_dark',
-    )
-    fig.show()
-
-
 def main():
     directory = os.fsencode('data')
     series = []
@@ -119,9 +77,15 @@ def main():
         if filename.endswith('.json'):
             try:
                 with open(filename) as f:
-                    index = re.search('(?<=-).+(?= )', f.name).group()
-                    json_series = pd.read_json(f.name, typ='series').rename(index)
-                    series.append(json_series)
+                    index = re.search('(?<=-).+(?= )', f.name).group()  # extract date
+                    data = json.load(f)
+                    # backwards compatiability for data sets that didn't have residuals calculated
+                    if 'values' in data:
+                        json_series = pd.Series(data['values'])
+                    else:
+                        json_series = pd.Series(data)
+
+                    series.append(json_series.rename(index))
             except ValueError:
                 continue
 
@@ -129,10 +93,11 @@ def main():
     beta_supply = ((df[df > 1.9].count() / df.count()) * 100).to_frame(
         name='supply_count'
     )
-    beta_dispersion = df.where(df.gt(df.quantile(0.9))).stack().groupby(level=1).agg(
-        'mean'
+    beta_dispersion = (
+        df.where(df.gt(df.quantile(0.9))).stack().groupby(level=1).agg('mean')
     ) - df.where(df.lt(df.quantile(0.1))).stack().groupby(level=1).agg('mean')
     beta_dispersion_trace = beta_dispersion.to_frame(name='beta_dispersion').plot()
+
     beta_supply['short_slope'] = beta_supply.rolling(7).apply(
         lambda s: linregress(range(len(s)), s)[0]
     )
@@ -203,7 +168,6 @@ def main():
         texttemplate='%{y:.2f}',
         textposition='top center',
         hovertemplate='Date: %{x}<br>Value: %{y:.2f}<br>',
-        # hoverlabel=dict(rgba=''),
         marker_line_color='#800020',
         marker_line_width=1.5,
     )
