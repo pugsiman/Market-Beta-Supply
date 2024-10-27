@@ -14,7 +14,6 @@ import plotly.express as px
 from datetime import datetime
 import os
 import re
-from utils.beta import Beta
 
 pd.options.plotting.backend = 'plotly'
 

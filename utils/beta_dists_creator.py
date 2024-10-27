@@ -15,8 +15,8 @@ def create_beta_distribution(sample_returns, date_str: str, tickers: str) -> str
     Parameters
     ----------
     sample_returns: dataframe
-    date_str: date formatted as '%Y-%m-%d'
-    tickers: string containing tickers
+    date_str: string formatted as '%Y-%m-%d'
+    tickers: string containing comma-seperated tickers
 
     Returns
     -------
@@ -67,8 +67,12 @@ def main():
     sample_stocks = df[
         (df['Test Issue'] == 'N')
         & (df['ETF'] == 'N')
-        & (df['Symbol'].str.match(r'^[A-Za-z]{2,4}$', na=False))
+        & (df['Symbol'].str.match(r'^[A-Za-z]{1,4}$', na=False))
         & ~(df['Security Name'].str.contains('ETN', na=False))
+        & ~(df['Security Name'].str.contains('Acquisition', na=False))
+        & ~(df['Security Name'].str.contains('ADR', na=False))
+        & ~(df['Security Name'].str.contains('Depositary', na=False))
+        & ~(df['Security Name'].str.contains('Trust', na=False))
     ]
     tickers = sample_stocks['Symbol'].values
     tickers_filepath = persist_tickers(tickers)
