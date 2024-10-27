@@ -10,7 +10,18 @@ INITIAL_DATE = '1/1/2021'
 NASDAQ_FTP_PATH = 'ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqtraded.txt'
 
 
-def create_beta_distribution(sample_returns, date_str, tickers):
+def create_beta_distribution(sample_returns, date_str: str, tickers: str) -> str:
+    """Creates a data distribution for all current beta estimator values and residuals for the date, then saves it
+    Parameters
+    ----------
+    sample_returns: dataframe
+    date_str: date formatted as '%Y-%m-%d'
+    tickers: string containing tickers
+
+    Returns
+    -------
+    filepath: string
+    """
     filepath = f'data/beta_dist-{date_str}.json'
 
     if not os.path.exists(filepath):
@@ -40,7 +51,7 @@ def create_beta_distribution(sample_returns, date_str, tickers):
     return filepath
 
 
-def persist_tickers(tickers):
+def persist_tickers(tickers) -> str:
     filepath = 'data/tickers.txt'
     if not os.path.exists(filepath):
         with open(filepath, 'a+') as f:
