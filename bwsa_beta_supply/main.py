@@ -3,23 +3,16 @@
 import numpy as np
 import json
 from scipy.stats import linregress
-from scipy.stats import zscore
 
-import yahooquery as yq
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
 
-from datetime import datetime
 import os
 import re
 
 pd.options.plotting.backend = 'plotly'
-
-BENCHMARK_INDEX = 'SPY'
-start_date = '2018-01-01'
-today_date = datetime.today().strftime('%Y-%m-%d')
 
 
 def main():
